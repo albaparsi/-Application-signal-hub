@@ -11,9 +11,9 @@ A privacy-first job application tracker. This repo is being built in phases:
 
 ## Phase 1 scope
 
-- `applications` — the core record (company, role, url, location, status, source, dates, notes).
-- `application_events` — append-only timeline of everything that happens to an application (created, status changes, notes). This table is the foundation Phase 3 will reuse when email-driven proposals get *approved* and turn into timeline entries.
-- `audit_log` — a separate, stricter trail of *who/what changed state and why* (actor, action, before/after). Kept separate from the timeline because the timeline is user-facing ("what happened to my application") while the audit log is a compliance/debugging trail (system-facing).
+- `applications`: the core record (company, role, url, location, status, source, dates, notes).
+- `application_events`: append-only timeline of everything that happens to an application (created, status changes, notes). This table is the foundation Phase 3 will reuse when email-driven proposals get *approved* and turn into timeline entries.
+- `audit_log`: a separate, stricter trail of *who/what changed state and why* (actor, action, before/after). Kept separate from the timeline because the timeline is user-facing ("what happened to my application") while the audit log is a compliance/debugging trail (system-facing).
 
 Two tables (`events` + `audit_log`) instead of one is a deliberate design choice: it keeps the user-facing timeline clean and readable while still giving you a rigorous audit trail underneath. Phase 3's `email_events` and `proposals` tables will slot in alongside these without changes to what's built here.
 
@@ -38,7 +38,7 @@ pytest
 
 ## Design notes / trade-offs made in Phase 1
 
-- **Free-text company/role** (not normalized lookup tables) — simpler for MVP, per project decision. Revisit if/when you want company-level analytics (e.g. "how many applications at each company") or autocomplete; that would want a `companies` table.
-- **No auth yet** — single-user assumption for MVP. Every model already has room to add a `user_id` column later without restructuring, but no auth middleware exists yet.
-- **Status transitions are currently unrestricted** — the API lets you set any status directly (e.g. `saved` → `offer`). Phase 2 is where we should decide whether to enforce a state machine (e.g. disallow `rejected` → `interview`) or keep it permissive since real job searches don't always move linearly.
-- **SQLite for tests, Postgres for dev/prod** — deliberate speed/fidelity trade-off. If you hit Postgres-specific bugs (e.g. JSONB behavior) that SQLite hides, we should add a docker-based integration test tier in Phase 4.
+- **Free-text company/role** (not normalized lookup tables): simpler for MVP, per project decision. Revisit if/when you want company-level analytics (e.g. "how many applications at each company") or autocomplete; that would want a `companies` table.
+- **No auth yet**: single-user assumption for MVP. Every model already has room to add a `user_id` column later without restructuring, but no auth middleware exists yet.
+- **Status transitions are currently unrestricted**: the API lets you set any status directly (e.g. `saved` → `offer`). Phase 2 is where we should decide whether to enforce a state machine (e.g. disallow `rejected` → `interview`) or keep it permissive since real job searches don't always move linearly.
+- **SQLite for tests, Postgres for dev/prod**: deliberate speed/fidelity trade-off. If you hit Postgres-specific bugs (e.g. JSONB behavior) that SQLite hides, we should add a docker-based integration test tier in Phase 4.
