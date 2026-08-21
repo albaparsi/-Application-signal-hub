@@ -1,9 +1,19 @@
-from sqlalchemy import or_, select
+from datetime import date
+
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.enums import ApplicationSource, ApplicationStatus, AuditAction, EventType
+from app.enums import (
+    ApplicationSource,
+    ApplicationStatus,
+    AuditAction,
+    EventType,
+    SortDir,
+    SortField,
+)
 from app.models import Application, ApplicationEvent, AuditLog
 from app.schemas import ApplicationCreate, ApplicationUpdate
+from app.transitions import InvalidTransitionError, validate_transition
 
 
 def _log_audit(
@@ -62,19 +72,34 @@ def get_application(db: Session, application_id: str) -> Application | None:
     return db.get(Application, application_id)
 
 
+_SORT_COLUMNS = {
+    SortField.CREATED_AT: Application.created_at,
+    SortField.UPDATED_AT: Application.updated_at,
+    SortField.APPLIED_DATE: Application.applied_date,
+    SortField.COMPANY: Application.company,
+    SortField.ROLE: Application.role,
+}
+
+
 def list_applications(
     db: Session,
-    status: ApplicationStatus | None = None,
+    status: list[ApplicationStatus] | None = None,
     company: str | None = None,
     source: ApplicationSource | None = None,
     q: str | None = None,
+    applied_date_from: date | None = None,
+    applied_date_to: date | None = None,
+    created_from: date | None = None,
+    created_to: date | None = None,
+    sort_by: SortField = SortField.CREATED_AT,
+    sort_dir: SortDir = SortDir.DESC,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Application], int]:
     stmt = select(Application)
 
-    if status is not None:
-        stmt = stmt.where(Application.status == status.value)
+    if status:
+        stmt = stmt.where(Application.status.in_([s.value for s in status]))
     if source is not None:
         stmt = stmt.where(Application.source == source.value)
     if company is not None:
@@ -88,16 +113,30 @@ def list_applications(
                 Application.notes.ilike(like),
             )
         )
+    if applied_date_from is not None:
+        stmt = stmt.where(Application.applied_date >= applied_date_from)
+    if applied_date_to is not None:
+        stmt = stmt.where(Application.applied_date <= applied_date_to)
+    if created_from is not None:
+        stmt = stmt.where(Application.created_at >= created_from)
+    if created_to is not None:
+        stmt = stmt.where(Application.created_at <= created_to)
 
-    total = len(db.execute(stmt).scalars().all())
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
 
-    stmt = stmt.order_by(Application.created_at.desc()).limit(limit).offset(offset)
+    sort_column = _SORT_COLUMNS[sort_by]
+    sort_column = sort_column.asc() if sort_dir == SortDir.ASC else sort_column.desc()
+    stmt = stmt.order_by(sort_column).limit(limit).offset(offset)
+
     items = db.execute(stmt).scalars().all()
     return list(items), total
 
 
 def update_application(
-    db: Session, application: Application, data: ApplicationUpdate
+    db: Session,
+    application: Application,
+    data: ApplicationUpdate,
+    force: bool = False,
 ) -> Application:
     updates = data.model_dump(exclude_unset=True)
     changed_fields: dict[str, dict[str, object]] = {}
@@ -114,6 +153,15 @@ def update_application(
         new_status_value = new_status.value if hasattr(new_status, "value") else new_status
         if new_status_value != application.status:
             old_status = application.status
+            try:
+                validate_transition(
+                    ApplicationStatus(old_status),
+                    ApplicationStatus(new_status_value),
+                    force=force,
+                )
+            except InvalidTransitionError:
+                db.rollback()  # discard any other field changes staged above
+                raise
             application.status = new_status_value
             db.add(
                 ApplicationEvent(

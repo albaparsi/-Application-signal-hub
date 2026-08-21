@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.database import Base, engine
-from app.routers import applications
+from app.routers import applications, emails, proposals
 
 # Phase 1: create tables directly on startup for dev convenience.
 # Once schema changes get more frequent (Phase 3+), switch to Alembic
@@ -15,6 +15,8 @@ app = FastAPI(
 )
 
 app.include_router(applications.router)
+app.include_router(emails.router)
+app.include_router(proposals.router)
 
 
 @app.get("/health")

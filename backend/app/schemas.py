@@ -67,3 +67,54 @@ class ApplicationListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class EmailIngestRequest(BaseModel):
+    """Payload representing one recruiting email. In production this would
+    come from a Gmail API pull; for now it's fed synthetic/sample data."""
+
+    message_id: str = Field(..., min_length=1, max_length=512)
+    from_address: str = Field(..., min_length=3, max_length=320)
+    subject: str = Field(..., max_length=998)
+    body: str = Field(default="", description="Full body — used for classification, not stored")
+    received_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class EmailEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    message_id: str
+    from_address: str
+    subject: str
+    body_excerpt: str | None
+    received_at: datetime
+    signal_type: str
+    classification_confidence: float
+    classification_evidence: dict | None
+    company_hint: str | None
+    match_status: str
+    matched_application_id: str | None
+    created_at: datetime
+
+
+class ProposalRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    application_id: str
+    email_event_id: str
+    proposed_status: str
+    status_at_proposal: str
+    confidence: float
+    evidence: str | None
+    status: str
+    decision_note: str | None
+    created_at: datetime
+    decided_at: datetime | None
+
+
+class EmailIngestResponse(BaseModel):
+    email_event: EmailEventRead
+    proposal: ProposalRead | None = None
+    message: str

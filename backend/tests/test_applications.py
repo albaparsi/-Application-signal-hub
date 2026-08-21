@@ -122,6 +122,119 @@ def test_delete_application(client, db_session):
     assert len(audit_rows) == 1
 
 
+def test_invalid_transition_rejected(client):
+    resp = create_sample_application(client, status="saved")
+    app_id = resp.json()["id"]
+
+    # saved -> offer is not an allowed direct transition
+    resp = client.patch(f"/applications/{app_id}", json={"status": "offer"})
+    assert resp.status_code == 409
+    assert "saved" in resp.json()["detail"]
+    assert "offer" in resp.json()["detail"]
+
+    # status should be unchanged
+    detail = client.get(f"/applications/{app_id}").json()
+    assert detail["status"] == "saved"
+
+
+def test_invalid_transition_with_force_succeeds(client):
+    resp = create_sample_application(client, status="saved")
+    app_id = resp.json()["id"]
+
+    resp = client.patch(f"/applications/{app_id}?force=true", json={"status": "offer"})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "offer"
+
+
+def test_terminal_state_locked(client):
+    resp = create_sample_application(client, status="applied")
+    app_id = resp.json()["id"]
+
+    client.patch(f"/applications/{app_id}", json={"status": "rejected"})
+
+    resp = client.patch(f"/applications/{app_id}", json={"status": "interview"})
+    assert resp.status_code == 409
+
+    detail = client.get(f"/applications/{app_id}").json()
+    assert detail["status"] == "rejected"
+
+
+def test_valid_transition_chain(client):
+    resp = create_sample_application(client, status="saved")
+    app_id = resp.json()["id"]
+
+    for target in ["applied", "screen", "interview", "offer"]:
+        resp = client.patch(f"/applications/{app_id}", json={"status": target})
+        assert resp.status_code == 200, f"failed moving to {target}: {resp.json()}"
+        assert resp.json()["status"] == target
+
+
+def test_interview_can_loop_to_itself(client):
+    resp = create_sample_application(client, status="interview")
+    app_id = resp.json()["id"]
+
+    resp = client.patch(f"/applications/{app_id}", json={"status": "interview"})
+    assert resp.status_code == 200
+
+
+def test_rejected_field_update_still_blocked_from_invalid_status(client, db_session):
+    """An invalid status transition should roll back any other field changes
+    sent in the same PATCH request, not partially apply them."""
+    resp = create_sample_application(client, status="saved")
+    app_id = resp.json()["id"]
+
+    resp = client.patch(
+        f"/applications/{app_id}",
+        json={"status": "offer", "notes": "should not be saved"},
+    )
+    assert resp.status_code == 409
+
+    detail = client.get(f"/applications/{app_id}").json()
+    assert detail["notes"] is None
+
+
+def test_multi_status_filter(client):
+    create_sample_application(client, company="A", status="saved")
+    create_sample_application(client, company="B", status="applied")
+    create_sample_application(client, company="C", status="offer")
+
+    resp = client.get("/applications", params=[("status", "saved"), ("status", "applied")])
+    body = resp.json()
+    assert body["total"] == 2
+    companies = {item["company"] for item in body["items"]}
+    assert companies == {"A", "B"}
+
+
+def test_sorting(client):
+    create_sample_application(client, company="Zeta", role="Engineer")
+    create_sample_application(client, company="Alpha", role="Engineer")
+
+    resp = client.get(
+        "/applications", params={"sort_by": "company", "sort_dir": "asc"}
+    )
+    companies = [item["company"] for item in resp.json()["items"]]
+    assert companies == ["Alpha", "Zeta"]
+
+    resp = client.get(
+        "/applications", params={"sort_by": "company", "sort_dir": "desc"}
+    )
+    companies = [item["company"] for item in resp.json()["items"]]
+    assert companies == ["Zeta", "Alpha"]
+
+
+def test_applied_date_range_filter(client):
+    create_sample_application(client, company="Early", applied_date="2026-01-01")
+    create_sample_application(client, company="Late", applied_date="2026-06-01")
+
+    resp = client.get(
+        "/applications",
+        params={"applied_date_from": "2026-03-01", "applied_date_to": "2026-12-31"},
+    )
+    body = resp.json()
+    assert body["total"] == 1
+    assert body["items"][0]["company"] == "Late"
+
+
 def test_pagination(client):
     for i in range(5):
         create_sample_application(client, role=f"Engineer {i}")

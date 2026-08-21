@@ -1,0 +1,58 @@
+[
+  {
+    "message_id": "sample-001",
+    "from_address": "no-reply@acme.com",
+    "subject": "Thank you for applying to Acme Corp",
+    "body": "Hi, we have received your application for the Software Engineer role and will be in touch soon.",
+    "received_at": "2026-02-01T09:00:00Z",
+    "_expects": "signal_type=confirmation, matches application at 'Acme Corp'"
+  },
+  {
+    "message_id": "sample-002",
+    "from_address": "recruiting@acme.com",
+    "subject": "Next steps with Acme",
+    "body": "We would like to invite you to interview for the Software Engineer position next week.",
+    "received_at": "2026-02-05T09:00:00Z",
+    "_expects": "signal_type=interview"
+  },
+  {
+    "message_id": "sample-003",
+    "from_address": "hr@globex.com",
+    "subject": "Update on your application at Globex",
+    "body": "Unfortunately, we have decided to move forward with other candidates for this role.",
+    "received_at": "2026-02-06T09:00:00Z",
+    "_expects": "signal_type=rejection, matches application at 'Globex'"
+  },
+  {
+    "message_id": "sample-004",
+    "from_address": "talent@initech.com",
+    "subject": "Congratulations from Initech!",
+    "body": "We are pleased to offer you the position of Senior Engineer at Initech.",
+    "received_at": "2026-02-10T09:00:00Z",
+    "_expects": "signal_type=offer"
+  },
+  {
+    "message_id": "sample-005",
+    "from_address": "no-reply@greenhouse.io",
+    "subject": "Thank you for your application to Hooli",
+    "body": "We have received your application and will review it shortly.",
+    "received_at": "2026-02-02T09:00:00Z",
+    "_expects": "signal_type=confirmation; company_hint parsed from subject since greenhouse.io is a shared ATS domain"
+  },
+  {
+    "message_id": "sample-006",
+    "from_address": "no-reply@greenhouse.io",
+    "subject": "An update on your candidacy",
+    "body": "Thanks for applying. We'll be in touch.",
+    "received_at": "2026-02-03T09:00:00Z",
+    "_expects": "match_status=unmatched; subject line doesn't contain a parseable company name"
+  },
+  {
+    "message_id": "sample-007",
+    "from_address": "newsletter@techweekly.com",
+    "subject": "Your weekly tech digest",
+    "body": "Here are this week's top stories in software engineering.",
+    "received_at": "2026-02-04T09:00:00Z",
+    "_expects": "signal_type=unknown; not a recruiting email at all"
+  }
+]
