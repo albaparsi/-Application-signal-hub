@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Save this application</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Save this application</h1>
+      <p class="subtitle">Nothing is saved until you confirm.</p>
+    </header>
+
+    <form id="save-form">
+      <label>
+        Company
+        <input type="text" id="company" required maxlength="255" />
+      </label>
+
+      <label>
+        Role
+        <input type="text" id="role" required maxlength="255" />
+      </label>
+
+      <label>
+        Location
+        <input type="text" id="location" maxlength="255" />
+      </label>
+
+      <label>
+        URL
+        <input type="text" id="url" maxlength="2048" />
+      </label>
+
+      <label>
+        Status
+        <select id="status">
+          <option value="saved" selected>Saved</option>
+          <option value="applied">Applied</option>
+          <option value="screen">Screen</option>
+          <option value="interview">Interview</option>
+          <option value="offer">Offer</option>
+          <option value="rejected">Rejected</option>
+          <option value="withdrawn">Withdrawn</option>
+        </select>
+      </label>
+
+      <label>
+        Notes
+        <textarea id="notes" rows="3" maxlength="2000"></textarea>
+      </label>
+
+      <div id="status-message" role="status"></div>
+
+      <div class="actions">
+        <button type="submit" id="save-button">Save application</button>
+      </div>
+    </form>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

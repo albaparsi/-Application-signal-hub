@@ -15,7 +15,7 @@ FastAPI + Python, PostgreSQL, SQLAlchemy 2.0, Alembic migrations, Docker
 Compose, pytest. Single-user MVP — no auth yet. Free-text company/role
 fields (no normalized lookup tables) by deliberate choice.
 
-## Current status: Phases 1–3 complete, DB hardening done
+## Current status: Phases 1–3 complete, DB hardening done, extension MVP started
 
 - **Phase 1**: CRUD for `applications`, Docker Compose, base data model
   (`applications`, `application_events` timeline, `audit_log`).
@@ -32,6 +32,18 @@ fields (no normalized lookup tables) by deliberate choice.
   mirroring the Python enums, then switched schema ownership from
   `Base.metadata.create_all()` to Alembic migrations entirely (see "Bugs
   already found" below for why this mattered).
+- **Browser extension (MVP)**: `extension/` — Manifest V3, `activeTab` +
+  `scripting` permissions only, plus `host_permissions` scoped to
+  `http://localhost:8000/*` (needed so the popup's `fetch` to the API isn't
+  blocked by CORS — this is the one narrow exception to "activeTab only,"
+  and it's our own API, not a third-party host). Click the toolbar icon →
+  popup extracts a best-guess company/role/url from the page (generic
+  heuristics: `<h1>`/title, `og:site_name`/hostname — no site-specific
+  scraping, that's the planned V2) → user reviews/edits every field →
+  explicit "Save application" submits `POST /applications` with
+  `source: "extension"`. Nothing is saved without that click. Load it via
+  `chrome://extensions` → Developer mode → Load unpacked → select
+  `extension/`.
 
 ## Not built yet (per original spec)
 
@@ -42,8 +54,8 @@ fields (no normalized lookup tables) by deliberate choice.
 - Gmail OAuth — real email ingestion. Right now `/email-events/ingest`
   takes a JSON payload; there's a `sample_emails.json` +
   `scripts/seed_sample_emails.py` for synthetic testing.
-- Browser extension (`activeTab` + manual "Save this application" flow —
-  see original spec below).
+- Extension V2: host permissions for specific supported job sites, to
+  replace the generic extraction heuristics with real per-site parsing.
 - React dashboard.
 
 ## Real bugs already found and fixed — don't reintroduce these
