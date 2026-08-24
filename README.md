@@ -25,6 +25,10 @@ docker compose up --build
 ```
 
 API docs: http://localhost:8000/docs
+Dashboard: http://localhost:8080
+
+See `extension/README.md` to load the browser extension for one-click
+saving from a job posting.
 
 ## Database migrations
 

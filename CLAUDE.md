@@ -15,7 +15,7 @@ FastAPI + Python, PostgreSQL, SQLAlchemy 2.0, Alembic migrations, Docker
 Compose, pytest. Single-user MVP — no auth yet. Free-text company/role
 fields (no normalized lookup tables) by deliberate choice.
 
-## Current status: Phases 1–3 complete, DB hardening done, extension MVP started
+## Current status: Phases 1–3 complete, DB hardening done, extension + dashboard MVPs started
 
 - **Phase 1**: CRUD for `applications`, Docker Compose, base data model
   (`applications`, `application_events` timeline, `audit_log`).
@@ -58,6 +58,17 @@ fields (no normalized lookup tables) by deliberate choice.
   can tell which path was used. The extension itself has one more fallback
   layer below that (pure local `<h1>`/`og:site_name` heuristics) for when
   the API is unreachable entirely.
+- **Dashboard (MVP)**: `dashboard/` — plain static HTML/CSS/JS (not React;
+  the original spec below said React, but this reaches the same goal
+  faster with zero build tooling — revisit if it outgrows this). Served by
+  an `nginx:alpine` container (`web` in `docker-compose.yml`) at
+  `http://localhost:8080`, talking to the API's existing
+  `GET /applications` (search/filter/sort/paginate, all server-side) and
+  `GET /applications/{id}` (detail + timeline). Read-only for now — no
+  editing, no proposal review yet. Because this is a separate origin from
+  the API (unlike the extension, no `host_permissions` exemption applies
+  to a plain webpage), `app/main.py` now has `CORSMiddleware` scoped
+  specifically to `http://localhost:8080` — don't widen that to `*`.
 
 ## Not built yet (per original spec)
 
@@ -70,7 +81,8 @@ fields (no normalized lookup tables) by deliberate choice.
   `scripts/seed_sample_emails.py` for synthetic testing.
 - Extension V2: host permissions for specific supported job sites, to
   replace the generic extraction heuristics with real per-site parsing.
-- React dashboard.
+- Dashboard: editing/status changes, proposal review UI, and a possible
+  React rewrite if the plain-JS version outgrows itself.
 
 ## Real bugs already found and fixed — don't reintroduce these
 

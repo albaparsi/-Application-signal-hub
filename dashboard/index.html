@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Application Signal Hub</title>
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Application Signal Hub</h1>
+      <p class="subtitle">Your job applications, tracked locally.</p>
+    </header>
+
+    <main>
+      <section class="toolbar">
+        <input
+          type="search"
+          id="search-input"
+          placeholder="Search company, role, notes…"
+          aria-label="Search applications"
+        />
+
+        <div class="filter-group" id="status-filters" role="group" aria-label="Filter by status"></div>
+
+        <select id="source-filter" aria-label="Filter by source">
+          <option value="">All sources</option>
+          <option value="manual">Manual</option>
+          <option value="extension">Extension</option>
+          <option value="email">Email</option>
+          <option value="seed">Seed</option>
+        </select>
+
+        <select id="sort-select" aria-label="Sort by">
+          <option value="created_at:desc">Newest first</option>
+          <option value="created_at:asc">Oldest first</option>
+          <option value="updated_at:desc">Recently updated</option>
+          <option value="applied_date:desc">Applied date (newest)</option>
+          <option value="applied_date:asc">Applied date (oldest)</option>
+          <option value="company:asc">Company (A–Z)</option>
+          <option value="role:asc">Role (A–Z)</option>
+        </select>
+      </section>
+
+      <section id="summary" class="summary"></section>
+
+      <section id="table-wrap" class="table-wrap">
+        <table id="applications-table">
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Location</th>
+              <th>Source</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody id="applications-body"></tbody>
+        </table>
+
+        <p id="empty-state" class="empty-state" hidden>No applications match these filters.</p>
+        <p id="loading-state" class="loading-state" hidden>Loading…</p>
+        <p id="error-state" class="error-state" hidden></p>
+      </section>
+
+      <section class="pagination">
+        <button id="prev-page" type="button">← Previous</button>
+        <span id="page-info"></span>
+        <button id="next-page" type="button">Next →</button>
+      </section>
+    </main>
+
+    <aside id="detail-panel" class="detail-panel" hidden aria-hidden="true">
+      <div class="detail-panel-inner">
+        <button id="close-detail" type="button" class="close-button" aria-label="Close">×</button>
+        <div id="detail-content"></div>
+      </div>
+    </aside>
+    <div id="detail-backdrop" class="detail-backdrop" hidden></div>
+
+    <script src="dashboard.js"></script>
+  </body>
+</html>
