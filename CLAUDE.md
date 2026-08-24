@@ -37,13 +37,27 @@ fields (no normalized lookup tables) by deliberate choice.
   `http://localhost:8000/*` (needed so the popup's `fetch` to the API isn't
   blocked by CORS — this is the one narrow exception to "activeTab only,"
   and it's our own API, not a third-party host). Click the toolbar icon →
-  popup extracts a best-guess company/role/url from the page (generic
-  heuristics: `<h1>`/title, `og:site_name`/hostname — no site-specific
-  scraping, that's the planned V2) → user reviews/edits every field →
-  explicit "Save application" submits `POST /applications` with
-  `source: "extension"`. Nothing is saved without that click. Load it via
-  `chrome://extensions` → Developer mode → Load unpacked → select
-  `extension/`.
+  popup gathers page context (URL, title, any `schema.org/JobPosting`
+  JSON-LD, a capped visible-text excerpt) and sends it to
+  `POST /extraction/infer` → user reviews/edits the pre-filled
+  company/role/location/status → explicit "Save application" submits
+  `POST /applications` with `source: "extension"`. Nothing is saved
+  without that click. Load it via `chrome://extensions` → Developer mode →
+  Load unpacked → select `extension/`.
+- **`POST /extraction/infer`** (`app/extraction.py`): LLM-assisted field
+  extraction for the extension, kept server-side specifically so the API
+  key never ships in the extension's client-side code (that code sits in
+  this public repo and in an unpacked/inspectable extension — a key baked
+  in there leaks immediately). Uses Claude (`claude-haiku-4-5`) via forced
+  tool-use for reliable structured JSON, primarily to infer **status**
+  (e.g. "applied" from a page that clearly shows a submitted application)
+  — something neither JSON-LD nor DOM heuristics can do. Configured via
+  `ANTHROPIC_API_KEY` in `.env` (optional). Without it — or if the call
+  fails for any reason — falls back to the extension's own
+  JobPosting-hints, `method: "heuristic"` in the response so the caller
+  can tell which path was used. The extension itself has one more fallback
+  layer below that (pure local `<h1>`/`og:site_name` heuristics) for when
+  the API is unreachable entirely.
 
 ## Not built yet (per original spec)
 

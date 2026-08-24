@@ -24,24 +24,96 @@ function setMessage(text, kind) {
 
 // Runs inside the page (via chrome.scripting.executeScript), not in the
 // extension's own context — keep this self-contained, no closures over
-// popup.js variables.
-function extractPageData() {
+// popup.js variables. Gathers everything the backend's /extraction/infer
+// (LLM-assisted) endpoint needs, plus a fully-local fallback in case that
+// call can't be reached at all (API down, offline, etc).
+function gatherPageContext() {
+  // Most real job boards (LinkedIn, Indeed, Greenhouse, Lever, Workday...)
+  // embed schema.org JobPosting structured data for Google Jobs SEO. It's
+  // far more reliable than scraping visible headings: e.g. on LinkedIn,
+  // the page's og:site_name is always "LinkedIn" itself, never the actual
+  // hiring company, but the JobPosting JSON-LD has the real one.
+  const readJobPosting = () => {
+    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    for (const script of scripts) {
+      let parsed;
+      try {
+        parsed = JSON.parse(script.textContent);
+      } catch {
+        continue;
+      }
+      const candidates = Array.isArray(parsed) ? parsed : parsed["@graph"] || [parsed];
+      for (const item of candidates) {
+        const type = item && item["@type"];
+        const isJobPosting = type === "JobPosting" || (Array.isArray(type) && type.includes("JobPosting"));
+        if (isJobPosting) return item;
+      }
+    }
+    return null;
+  };
+
+  const flattenLocation = (jobLocation) => {
+    const loc = Array.isArray(jobLocation) ? jobLocation[0] : jobLocation;
+    if (!loc) return "";
+    if (typeof loc === "string") return loc;
+    const address = loc.address;
+    if (!address) return "";
+    if (typeof address === "string") return address;
+    return [address.addressLocality, address.addressRegion, address.addressCountry]
+      .filter(Boolean)
+      .join(", ");
+  };
+
   const getMeta = (name) => {
     const el = document.querySelector(`meta[property="${name}"], meta[name="${name}"]`);
     return el && el.content ? el.content.trim() : "";
   };
 
-  const h1 = document.querySelector("h1");
-  const role = (h1 && h1.innerText.trim()) || document.title.trim();
+  const jobPosting = readJobPosting();
+  const jobPostingHints = {
+    company:
+      jobPosting && jobPosting.hiringOrganization
+        ? String(
+            typeof jobPosting.hiringOrganization === "string"
+              ? jobPosting.hiringOrganization
+              : jobPosting.hiringOrganization.name || ""
+          ).trim()
+        : "",
+    role: jobPosting && jobPosting.title ? String(jobPosting.title).trim() : "",
+    location: jobPosting ? flattenLocation(jobPosting.jobLocation) : "",
+  };
 
-  let company = getMeta("og:site_name");
-  if (!company) {
-    const host = location.hostname.replace(/^www\./, "");
-    const base = host.split(".").slice(0, -1).join(".") || host;
-    company = base.charAt(0).toUpperCase() + base.slice(1);
+  // Pure local heuristic — used only if the backend call fails entirely
+  // (server extraction handles JSON-LD-less pages far better via the LLM).
+  let fallbackRole = jobPostingHints.role;
+  let fallbackCompany = jobPostingHints.company;
+  if (!fallbackRole) {
+    const h1 = document.querySelector("h1");
+    fallbackRole = (h1 && h1.innerText.trim()) || document.title.trim();
+  }
+  if (!fallbackCompany) {
+    fallbackCompany = getMeta("og:site_name");
+    if (!fallbackCompany) {
+      const host = location.hostname.replace(/^www\./, "");
+      const base = host.split(".").slice(0, -1).join(".") || host;
+      fallbackCompany = base.charAt(0).toUpperCase() + base.slice(1);
+    }
   }
 
-  return { role, company, url: location.href };
+  return {
+    url: location.href,
+    title: document.title,
+    // Capped to keep the payload small — this is sent off-device to the
+    // configured LLM, so it's deliberately a bounded excerpt, not the
+    // full page.
+    visibleText: (document.body ? document.body.innerText : "").slice(0, 6000),
+    jobPostingHints,
+    localFallback: {
+      company: fallbackCompany,
+      role: fallbackRole,
+      location: jobPostingHints.location,
+    },
+  };
 }
 
 async function prefillFromActiveTab() {
@@ -57,13 +129,42 @@ async function prefillFromActiveTab() {
 
     const [{ result }] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: extractPageData,
+      func: gatherPageContext,
     });
-    if (result) {
-      fields.company.value = result.company || "";
-      fields.role.value = result.role || "";
-      fields.url.value = result.url || fields.url.value;
+    if (!result) return;
+
+    fields.url.value = result.url || fields.url.value;
+
+    try {
+      const hints = result.jobPostingHints;
+      const hasHints = hints && (hints.company || hints.role || hints.location);
+
+      const response = await fetch(`${API_BASE}/extraction/infer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: result.url,
+          title: result.title,
+          job_posting_hints: hasHints ? hints : null,
+          visible_text: result.visibleText,
+        }),
+      });
+      if (!response.ok) throw new Error(`extraction endpoint returned ${response.status}`);
+
+      const data = await response.json();
+      fields.company.value = data.company || "";
+      fields.role.value = data.role || "";
+      fields.location.value = data.location || "";
+      if (data.status) fields.status.value = data.status;
+      return;
+    } catch (err) {
+      console.debug("Application Signal Hub: server extraction unavailable, using local fallback", err);
     }
+
+    const fb = result.localFallback || {};
+    fields.company.value = fb.company || "";
+    fields.role.value = fb.role || "";
+    fields.location.value = fb.location || "";
   } catch (err) {
     console.debug("Application Signal Hub: page extraction skipped", err);
   }

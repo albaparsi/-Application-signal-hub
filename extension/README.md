@@ -18,11 +18,26 @@ Nothing is saved without that explicit click.
 
 1. Open a job posting page.
 2. Click the extension icon.
-3. Company/role/URL are pre-filled with a best-effort guess (page `<h1>`,
-   `og:site_name`/hostname) — this is generic, not site-specific, so check
-   it before saving.
-4. Fix anything wrong, set a status if it's not just "saved", and click
-   **Save application**.
+3. Company/role/location/status/URL are pre-filled by
+   `POST /extraction/infer` on the backend, which:
+   - Uses an LLM (Claude) when `ANTHROPIC_API_KEY` is set in `.env` — this
+     is what infers **status** (e.g. "applied" if the page clearly shows a
+     submitted application), which structured data and DOM heuristics
+     can't do.
+   - Otherwise falls back to the page's `schema.org/JobPosting` structured
+     data (`application/ld+json`) if present — most real job boards
+     (LinkedIn, Indeed, Greenhouse, Lever, Workday...) embed this for
+     Google Jobs SEO, and it's far more reliable than scraping visible
+     text (e.g. it's how we get the real hiring company on LinkedIn
+     instead of "LinkedIn" itself).
+   - If the API can't be reached at all, the popup falls back once more to
+     a fully local `<h1>`/`og:site_name`/hostname guess (no status
+     inference in that case — defaults to "saved").
+
+   Whichever path fills it in, check it before saving — it's a starting
+   point, not guaranteed correct.
+4. Fix anything wrong (or leave it — that's the point), add notes if you
+   want, and click **Save application**.
 
 ## Permissions, and why
 

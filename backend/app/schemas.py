@@ -118,3 +118,26 @@ class EmailIngestResponse(BaseModel):
     email_event: EmailEventRead
     proposal: ProposalRead | None = None
     message: str
+
+
+class ExtractionRequest(BaseModel):
+    """Page context the browser extension gathered client-side, sent here
+    so the LLM call (and its API key) stays server-side. Deliberately not
+    a full HTML/DOM dump — just enough for the model to work with, kept
+    small for cost and so incidental page content isn't shipped wholesale
+    to a third-party API."""
+
+    url: str = Field(..., max_length=2048)
+    title: str = Field(default="", max_length=500)
+    job_posting_hints: dict | None = Field(
+        default=None, description="Trimmed schema.org JobPosting fields, if the page had any"
+    )
+    visible_text: str = Field(default="", max_length=6000)
+
+
+class ExtractionResponse(BaseModel):
+    company: str = ""
+    role: str = ""
+    location: str = ""
+    status: ApplicationStatus = ApplicationStatus.SAVED
+    method: str = Field(description="'llm' or 'heuristic' — which path produced this result")

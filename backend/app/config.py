@@ -18,5 +18,12 @@ class Settings:
         "postgresql+psycopg2://signalhub:signalhub@localhost:5433/signalhub",
     )
 
+    # Used by /extraction/infer to fill in the browser extension's preview
+    # form (company/role/location/status) from page context. Server-side
+    # only — never exposed to the extension's client-side code, since that
+    # code ships in an unpacked/public repo where a key would leak
+    # immediately. Extraction degrades to local heuristics when unset.
+    anthropic_api_key: str | None = os.getenv("ANTHROPIC_API_KEY")
+
 
 settings = Settings()
