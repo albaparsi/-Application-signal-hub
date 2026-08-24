@@ -38,8 +38,19 @@ def test_create_application_writes_timeline_and_audit(client, db_session):
 
 
 def test_get_application_not_found(client):
-    resp = client.get("/applications/does-not-exist")
+    # Well-formed UUID that simply doesn't exist -> 404.
+    resp = client.get("/applications/00000000-0000-0000-0000-000000000000")
     assert resp.status_code == 404
+
+
+def test_get_application_malformed_id(client):
+    # Not a UUID at all -> 422 (input validation), not 404 — these are
+    # different failure modes and shouldn't be conflated. This also guards
+    # against a real bug: Postgres' native UUID column type rejects
+    # malformed input before a query even runs, which would otherwise
+    # surface as an unhandled 500 in production.
+    resp = client.get("/applications/does-not-exist")
+    assert resp.status_code == 422
 
 
 def test_list_applications_with_filters(client):

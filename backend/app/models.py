@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, timezone
 
-from sqlalchemy import DateTime, Date, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, Date, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -22,6 +22,21 @@ def _uuid() -> str:
     return str(uuid.uuid4())
 
 
+def _sql_in_list(*enums) -> str:
+    """Build a SQL 'val1','val2',... literal list from one or more enum
+    classes, so CHECK constraints can never drift out of sync with the
+    Python-side enum they're meant to mirror."""
+    values = [member.value for enum_cls in enums for member in enum_cls]
+    return ", ".join(f"'{v}'" for v in values)
+
+
+_APPLICATION_STATUS_LIST = _sql_in_list(ApplicationStatus)
+_APPLICATION_SOURCE_LIST = _sql_in_list(ApplicationSource)
+_EMAIL_SIGNAL_TYPE_LIST = _sql_in_list(EmailSignalType)
+_MATCH_STATUS_LIST = _sql_in_list(MatchStatus)
+_PROPOSAL_STATUS_LIST = _sql_in_list(ProposalStatus)
+
+
 # JSONB is Postgres-only; fall back to generic JSON so tests can run on
 # SQLite without a separate schema.
 def _json_type():
@@ -34,6 +49,14 @@ def _json_type():
 
 class Application(Base):
     __tablename__ = "applications"
+    __table_args__ = (
+        CheckConstraint(
+            f"status IN ({_APPLICATION_STATUS_LIST})", name="ck_applications_status_valid"
+        ),
+        CheckConstraint(
+            f"source IN ({_APPLICATION_SOURCE_LIST})", name="ck_applications_source_valid"
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False).with_variant(String(36), "sqlite"),
@@ -74,6 +97,20 @@ class ApplicationEvent(Base):
     """Append-only, user-facing timeline: 'what happened to this application'."""
 
     __tablename__ = "application_events"
+    __table_args__ = (
+        CheckConstraint(
+            f"from_status IS NULL OR from_status IN ({_APPLICATION_STATUS_LIST})",
+            name="ck_application_events_from_status_valid",
+        ),
+        CheckConstraint(
+            f"to_status IS NULL OR to_status IN ({_APPLICATION_STATUS_LIST})",
+            name="ck_application_events_to_status_valid",
+        ),
+        CheckConstraint(
+            f"source IN ({_APPLICATION_SOURCE_LIST})",
+            name="ck_application_events_source_valid",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False).with_variant(String(36), "sqlite"),
@@ -140,7 +177,23 @@ class EmailEvent(Base):
     """
 
     __tablename__ = "email_events"
-    __table_args__ = (UniqueConstraint("message_id", name="uq_email_events_message_id"),)
+    __table_args__ = (
+        UniqueConstraint("message_id", name="uq_email_events_message_id"),
+        CheckConstraint(
+            f"signal_type IN ({_EMAIL_SIGNAL_TYPE_LIST})",
+            name="ck_email_events_signal_type_valid",
+        ),
+        CheckConstraint(
+            f"match_status IN ({_MATCH_STATUS_LIST})", name="ck_email_events_match_status_valid"
+        ),
+        CheckConstraint(
+            "classification_confidence >= 0 AND classification_confidence <= 1",
+            name="ck_email_events_confidence_range",
+        ),
+        CheckConstraint(
+            "length(body_excerpt) <= 300", name="ck_email_events_body_excerpt_maxlen"
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False).with_variant(String(36), "sqlite"),
@@ -180,7 +233,21 @@ class Proposal(Base):
     """
 
     __tablename__ = "proposals"
-    __table_args__ = (UniqueConstraint("email_event_id", name="uq_proposals_email_event_id"),)
+    __table_args__ = (
+        UniqueConstraint("email_event_id", name="uq_proposals_email_event_id"),
+        CheckConstraint(f"status IN ({_PROPOSAL_STATUS_LIST})", name="ck_proposals_status_valid"),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1", name="ck_proposals_confidence_range"
+        ),
+        CheckConstraint(
+            f"proposed_status IN ({_APPLICATION_STATUS_LIST})",
+            name="ck_proposals_proposed_status_valid",
+        ),
+        CheckConstraint(
+            f"status_at_proposal IN ({_APPLICATION_STATUS_LIST})",
+            name="ck_proposals_status_at_proposal_valid",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False).with_variant(String(36), "sqlite"),

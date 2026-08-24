@@ -26,6 +26,22 @@ docker compose up --build
 
 API docs: http://localhost:8000/docs
 
+## Database migrations
+
+Schema is owned by Alembic, not SQLAlchemy's `create_all()`. The `api`
+container runs `alembic upgrade head` automatically before starting the
+server. When you change a model, generate a migration and review it by
+hand before committing:
+
+```bash
+cd backend
+DATABASE_URL=postgresql+psycopg2://signalhub:signalhub@localhost:5433/signalhub \
+  alembic revision --autogenerate -m "describe the change"
+```
+
+(Host port is 5433, not Postgres' default 5432 — see
+`docker-compose.yml`'s `db` service.)
+
 ## Running tests
 
 Tests use an in-memory SQLite database for speed (no Docker required):

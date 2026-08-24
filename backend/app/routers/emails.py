@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -26,7 +28,6 @@ def list_email_events(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
-    stmt_filters = []
     query = db.query(EmailEvent)
     if signal_type is not None:
         query = query.filter(EmailEvent.signal_type == signal_type.value)
@@ -38,8 +39,8 @@ def list_email_events(
 
 
 @router.get("/{email_event_id}", response_model=EmailEventRead)
-def get_email_event(email_event_id: str, db: Session = Depends(get_db)):
-    event = db.get(EmailEvent, email_event_id)
+def get_email_event(email_event_id: UUID, db: Session = Depends(get_db)):
+    event = db.get(EmailEvent, str(email_event_id))
     if event is None:
         raise HTTPException(status_code=404, detail="Email event not found")
     return event

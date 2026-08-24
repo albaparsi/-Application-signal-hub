@@ -1,13 +1,9 @@
 from fastapi import FastAPI
 
-from app.database import Base, engine
 from app.routers import applications, emails, proposals
 
-# Phase 1: create tables directly on startup for dev convenience.
-# Once schema changes get more frequent (Phase 3+), switch to Alembic
-# migrations exclusively and drop this.
-Base.metadata.create_all(bind=engine)
-
+# Schema is owned by Alembic migrations (see migrations/), applied via
+# `alembic upgrade head` before the server starts — not created here.
 app = FastAPI(
     title="Application Signal Hub API",
     description="Privacy-first job application tracker.",

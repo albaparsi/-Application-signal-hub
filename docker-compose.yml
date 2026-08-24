@@ -7,9 +7,15 @@ services:
       POSTGRES_PASSWORD: signalhub
       POSTGRES_DB: signalhub
     ports:
-      - "5432:5432"
+      # 5433 on the host: a native Postgres install commonly squats on the
+      # default 5432, so we avoid colliding with it. The api service talks
+      # to the container over the internal Docker network on db:5432
+      # regardless — this only affects host-side tools (psql, alembic,
+      # pytest against Postgres).
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres-initdb.d:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U signalhub"]
       interval: 5s
@@ -30,7 +36,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
 volumes:
   pgdata:

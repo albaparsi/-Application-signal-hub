@@ -1,4 +1,5 @@
 from datetime import date
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -60,8 +61,8 @@ def list_applications(
 
 
 @router.get("/{application_id}", response_model=ApplicationDetailRead)
-def get_application(application_id: str, db: Session = Depends(get_db)):
-    application = crud.get_application(db, application_id)
+def get_application(application_id: UUID, db: Session = Depends(get_db)):
+    application = crud.get_application(db, str(application_id))
     if application is None:
         raise HTTPException(status_code=404, detail="Application not found")
     return application
@@ -69,14 +70,14 @@ def get_application(application_id: str, db: Session = Depends(get_db)):
 
 @router.patch("/{application_id}", response_model=ApplicationRead)
 def update_application(
-    application_id: str,
+    application_id: UUID,
     payload: ApplicationUpdate,
     force: bool = Query(
         default=False, description="Override transition rules (e.g. reopen a rejected application)"
     ),
     db: Session = Depends(get_db),
 ):
-    application = crud.get_application(db, application_id)
+    application = crud.get_application(db, str(application_id))
     if application is None:
         raise HTTPException(status_code=404, detail="Application not found")
     try:
@@ -86,8 +87,8 @@ def update_application(
 
 
 @router.delete("/{application_id}", status_code=204)
-def delete_application(application_id: str, db: Session = Depends(get_db)):
-    application = crud.get_application(db, application_id)
+def delete_application(application_id: UUID, db: Session = Depends(get_db)):
+    application = crud.get_application(db, str(application_id))
     if application is None:
         raise HTTPException(status_code=404, detail="Application not found")
     crud.delete_application(db, application)
